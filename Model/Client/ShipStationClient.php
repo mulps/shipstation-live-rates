@@ -69,13 +69,14 @@ class ShipStationClient
         }
 
         $weightLb = max(0.1, (float) $request->getPackageWeight());
+        $destStreet = trim((string) $request->getDestStreet());
 
         try {
-            $body = $this->postJson(
-                '/rates',
-                $this->fullRatePayload($request, $carrierIds, $origin, $dest, $weightLb, $storeId),
-                $storeId
-            );
+            if ($destStreet === '') {
+                $body = $this->postJson('/rates/estimate', $this->estimatePayload($request, $carrierIds, $origin, $dest, $weightLb, $storeId), $storeId);
+            } else {
+                $body = $this->postJson('/rates', $this->fullRatePayload($request, $carrierIds, $origin, $dest, $weightLb, $storeId), $storeId);
+            }
         } catch (RuntimeException $e) {
             $this->logger->error('Mulps_ShipStationLiveRates live rate failed: ' . $e->getMessage());
             $this->cache->save('1', self::CIRCUIT_KEY, ['MULPS_SSLR'], 120);
@@ -83,14 +84,11 @@ class ShipStationClient
         }
 
         $rateResponse = is_array($body['rate_response'] ?? null) ? $body['rate_response'] : $body;
-        $rates = $rateResponse['rates'] ?? $body['rates'] ?? $body;
+        $rates = $rateResponse['rates'] ?? $body['rates'] ?? null;
         if (!is_array($rates)) {
-            $rates = [];
+            $rates = array_is_list($body) ? $body : [];
         }
-        $rates = array_values(array_filter($rates, 'is_array'));
-        if ($rates !== [] && !isset($rates[0]['shipping_amount']) && isset($rates[0][0]) && is_array($rates[0][0])) {
-            $rates = $rates[0];
-        }
+        $rates = array_values(array_filter($rates, static fn (mixed $row): bool => is_array($row) && isset($row['shipping_amount'])));
 
         $result = [
             'rates' => $rates,
@@ -157,6 +155,39 @@ class ShipStationClient
     }
 
     /**
+     * Cart estimate: ZIP/state/weight only. ShipStation does not require street here.
+     *
+     * @param list<string> $carrierIds
+     * @return array<string, mixed>
+     */
+    private function estimatePayload(
+        RateRequest $request,
+        array $carrierIds,
+        string $origin,
+        string $dest,
+        float $weightLb,
+        ?int $storeId
+    ): array {
+        return [
+            'carrier_ids' => $carrierIds,
+            'from_country_code' => $this->config->getOriginCountry($storeId),
+            'from_postal_code' => $origin,
+            'to_country_code' => $request->getDestCountryId() ?: 'US',
+            'to_postal_code' => $dest,
+            'to_city_locality' => (string) $request->getDestCity(),
+            'to_state_province' => (string) $request->getDestRegionCode(),
+            'weight' => [
+                'value' => $weightLb,
+                'unit' => 'pound',
+            ],
+            'confirmation' => 'none',
+            'address_residential_indicator' => 'unknown',
+        ];
+    }
+
+    /**
+     * Checkout quote with a street. no_validation so unofficial addresses still rate.
+     *
      * @param list<string> $carrierIds
      * @return array<string, mixed>
      */
