@@ -12,9 +12,10 @@ use Symfony\Component\Console\Output\OutputInterface;
 class RebuildHeuristicCommand extends Command
 {
     public function __construct(
-        private readonly RebuildHeuristic $rebuild
+        private readonly RebuildHeuristic $rebuild,
+        ?string $name = 'ssliverates:rebuild-heuristic'
     ) {
-        parent::__construct();
+        parent::__construct($name);
     }
 
     protected function configure(): void
