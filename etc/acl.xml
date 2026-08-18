@@ -4,10 +4,8 @@
     <acl>
         <resources>
             <resource id="Magento_Backend::admin">
-                <resource id="Magento_Sales::sales">
-                    <resource id="Magento_Sales::shipment">
-                        <resource id="Mulps_ShipStationLiveRates::config" title="ShipStation Live Rates"/>
-                    </resource>
+                <resource id="Magento_Config::config">
+                    <resource id="Mulps_ShipStationLiveRates::config" title="ShipStation Live Rates"/>
                 </resource>
             </resource>
         </resources>
