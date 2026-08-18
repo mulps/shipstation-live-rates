@@ -37,7 +37,7 @@ class RebuildHeuristic
         /** @var array<string, list<float>> $groups */
         $groups = [];
         $page = 1;
-        $pageSize = 100;
+        $pageSize = 25;
         $pages = 1;
 
         try {
@@ -48,7 +48,7 @@ class RebuildHeuristic
                     'page' => $page,
                     'page_size' => $pageSize,
                 ]);
-                $body = $this->client->getJson('/labels?' . $query);
+                $body = $this->client->getJson('/labels?' . $query, null, 90);
                 $labels = $body['labels'] ?? [];
                 $pages = (int) ($body['pages'] ?? $page);
                 if (!is_array($labels)) {

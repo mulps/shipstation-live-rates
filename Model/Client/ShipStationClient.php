@@ -284,12 +284,10 @@ class ShipStationClient
     /**
      * @return array<string, mixed>
      */
-    public function getJson(string $pathWithQuery, ?int $storeId = null): array
+    public function getJson(string $pathWithQuery, ?int $storeId = null, ?int $timeoutSeconds = null): array
     {
         $curl = $this->curlFactory->create();
-        $timeout = $this->config->getTimeoutSeconds($storeId);
-        $curl->setOption(CURLOPT_TIMEOUT, $timeout);
-        $curl->setOption(CURLOPT_CONNECTTIMEOUT, $timeout);
+        $this->applyTimeout($curl, $timeoutSeconds ?? $this->config->getTimeoutSeconds($storeId));
         $curl->addHeader('API-Key', $this->config->getApiKey($storeId));
         $url = $this->config->getApiBaseUrl($storeId) . $pathWithQuery;
         $curl->get($url);
@@ -303,14 +301,22 @@ class ShipStationClient
     public function postJson(string $path, array $payload, ?int $storeId = null): array
     {
         $curl = $this->curlFactory->create();
-        $timeout = $this->config->getTimeoutSeconds($storeId);
-        $curl->setOption(CURLOPT_TIMEOUT, $timeout);
-        $curl->setOption(CURLOPT_CONNECTTIMEOUT, $timeout);
+        $this->applyTimeout($curl, $this->config->getTimeoutSeconds($storeId));
         $curl->addHeader('Content-Type', 'application/json');
         $curl->addHeader('API-Key', $this->config->getApiKey($storeId));
         $url = $this->config->getApiBaseUrl($storeId) . $path;
         $curl->post($url, json_encode($payload, JSON_THROW_ON_ERROR));
         return $this->decodeResponse($curl);
+    }
+
+    private function applyTimeout(Curl $curl, int $timeoutSeconds): void
+    {
+        $timeoutSeconds = max(1, $timeoutSeconds);
+        if (method_exists($curl, 'setTimeout')) {
+            $curl->setTimeout($timeoutSeconds);
+        }
+        $curl->setOption(CURLOPT_TIMEOUT, $timeoutSeconds);
+        $curl->setOption(CURLOPT_CONNECTTIMEOUT, min(20, $timeoutSeconds));
     }
 
     /**
