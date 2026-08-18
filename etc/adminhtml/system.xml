@@ -26,7 +26,7 @@
                 </field>
                 <field id="carrier_ids" translate="label comment" type="text" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Carrier IDs</label>
-                    <comment>Comma-separated ShipStation carrier_ids for POST /v2/rates.</comment>
+                    <comment>Optional. Leave empty to use every carrier from GET /v2/carriers. Set a comma-separated list (e.g. se-199728) to restrict which accounts are rated.</comment>
                 </field>
                 <field id="origin_postal_code" translate="label" type="text" sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Origin Postal Code</label>

@@ -35,21 +35,32 @@ class ShipStationClient
             return null;
         }
 
-        $fingerprint = $this->fingerprint($request, $storeId);
+        $apiKey = $this->config->getApiKey($storeId);
+        $origin = $this->config->getOriginPostalCode($storeId);
+        if ($apiKey === '' || $origin === '') {
+            $this->logger->warning('Mulps_ShipStationLiveRates: live rates skipped, missing API key or origin ZIP');
+            return null;
+        }
+
+        try {
+            $carrierIds = $this->resolveCarrierIds($storeId);
+        } catch (RuntimeException $e) {
+            $this->logger->error('Mulps_ShipStationLiveRates carrier list failed: ' . $e->getMessage());
+            $this->cache->save('1', self::CIRCUIT_KEY, ['MULPS_SSLR'], 120);
+            return null;
+        }
+        if ($carrierIds === []) {
+            $this->logger->warning('Mulps_ShipStationLiveRates: no ShipStation carriers available');
+            return null;
+        }
+
+        $fingerprint = $this->fingerprint($request, $storeId, $carrierIds);
         $cached = $this->cache->load(self::CACHE_PREFIX . $fingerprint);
         if (is_string($cached) && $cached !== '') {
             $decoded = json_decode($cached, true);
             if (is_array($decoded)) {
                 return $decoded;
             }
-        }
-
-        $apiKey = $this->config->getApiKey($storeId);
-        $carrierIds = $this->config->getCarrierIds($storeId);
-        $origin = $this->config->getOriginPostalCode($storeId);
-        if ($apiKey === '' || $carrierIds === [] || $origin === '') {
-            $this->logger->warning('Mulps_ShipStationLiveRates: live rates skipped, missing API key, carrier IDs, or origin ZIP');
-            return null;
         }
 
         $dest = preg_replace('/\s+/', '', (string) $request->getDestPostcode()) ?? '';
@@ -119,6 +130,52 @@ class ShipStationClient
     }
 
     /**
+     * Admin list if set; otherwise every usable carrier from GET /v2/carriers (cached).
+     *
+     * @return list<string>
+     */
+    public function resolveCarrierIds(?int $storeId = null): array
+    {
+        $configured = $this->config->getCarrierIds($storeId);
+        if ($configured !== []) {
+            return $configured;
+        }
+
+        $cacheKey = 'mulps_sslr_carriers_' . sha1($this->config->getApiBaseUrl($storeId));
+        $cached = $this->cache->load($cacheKey);
+        if (is_string($cached) && $cached !== '') {
+            $decoded = json_decode($cached, true);
+            if (is_array($decoded) && $decoded !== []) {
+                return array_values(array_filter($decoded, 'is_string'));
+            }
+        }
+
+        $body = $this->getJson('/carriers', $storeId);
+        $ids = [];
+        $carriers = $body['carriers'] ?? [];
+        if (is_array($carriers)) {
+            foreach ($carriers as $carrier) {
+                if (!is_array($carrier)) {
+                    continue;
+                }
+                if (!empty($carrier['disabled_by_billing_plan'])) {
+                    continue;
+                }
+                $id = (string) ($carrier['carrier_id'] ?? '');
+                if ($id === '') {
+                    continue;
+                }
+                $ids[] = $id;
+            }
+        }
+        $ids = array_values(array_unique($ids));
+        if ($ids !== []) {
+            $this->cache->save(json_encode($ids, JSON_THROW_ON_ERROR), $cacheKey, ['MULPS_SSLR'], 3600);
+        }
+        return $ids;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function getJson(string $pathWithQuery, ?int $storeId = null): array
@@ -170,14 +227,17 @@ class ShipStationClient
         return $decoded;
     }
 
-    private function fingerprint(RateRequest $request, ?int $storeId): string
+    /**
+     * @param list<string> $carrierIds
+     */
+    private function fingerprint(RateRequest $request, ?int $storeId, array $carrierIds): string
     {
         $parts = [
             (string) $request->getDestPostcode(),
             (string) $request->getDestCountryId(),
             (string) $request->getPackageWeight(),
             $this->config->getOriginPostalCode($storeId),
-            implode(',', $this->config->getCarrierIds($storeId)),
+            implode(',', $carrierIds),
         ];
         return hash('sha256', implode('|', $parts));
     }

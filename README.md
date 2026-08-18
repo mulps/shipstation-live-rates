@@ -26,7 +26,7 @@ bin/magento setup:upgrade
 bin/magento cache:flush
 ```
 
-Configure **Stores → Configuration → Sales → Shipping Methods → ShipStation Live Rates**: API key, carrier IDs, origin postal code, global markup %, optional regional JSON `{"100":12,"850":8}`.
+Configure **Stores → Configuration → Sales → Shipping Methods → ShipStation Live Rates**: API key, origin postal code, optional carrier IDs (empty = all carriers from the API), global markup %, optional regional JSON `{"100":12,"850":8}`.
 
 After `git pull` in the module folder: `setup:upgrade` if `etc/` changed, then `cache:flush`.
 
