@@ -28,7 +28,10 @@
                     <label>Carrier IDs</label>
                     <comment>Optional. Leave empty to rate all connected ShipStation carriers, or enter specific carrier IDs separated by commas.</comment>
                 </field>
+                <field id="origin_postal_code" translate="label comment" type="text" sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Origin Postal Code</label>
                     <comment>Optional. If blank, uses the origin ZIP from Stores → Configuration → Sales → Shipping Settings.</comment>
+                </field>
                 <field id="timeout_seconds" translate="label" type="text" sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Live Rate Timeout (seconds)</label>
                 </field>
@@ -59,6 +62,17 @@
                 </field>
                 <field id="lookback_days" translate="label" type="text" sortOrder="160" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>History Lookback (days)</label>
+                </field>
+                <field id="default_weight_lb" translate="label comment" type="text" sortOrder="165" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Default Package Weight (lb)</label>
+                    <comment>Used when a product has no weight so a rate can still be calculated.</comment>
+                </field>
+                <field id="guaranteed_price" translate="label comment" type="text" sortOrder="170" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Backup Shipping Price</label>
+                    <comment>Shown if live rates cannot be calculated so the customer always has a shipping option.</comment>
+                </field>
+                <field id="guaranteed_title" translate="label" type="text" sortOrder="175" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Backup Method Name</label>
                 </field>
                 <field id="sallowspecific" translate="label" type="select" sortOrder="200" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Ship to Applicable Countries</label>

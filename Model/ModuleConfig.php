@@ -154,4 +154,31 @@ class ModuleConfig
     {
         return max(1, (int) $this->scopeConfig->getValue(self::XML . 'lookback_days', ScopeInterface::SCOPE_STORE, $storeId));
     }
+
+    public function getDefaultWeightLb(?int $storeId = null): float
+    {
+        $value = (float) $this->scopeConfig->getValue(self::XML . 'default_weight_lb', ScopeInterface::SCOPE_STORE, $storeId);
+        return $value > 0 ? $value : 0.5;
+    }
+
+    public function getGuaranteedPrice(?int $storeId = null): float
+    {
+        $value = (float) $this->scopeConfig->getValue(self::XML . 'guaranteed_price', ScopeInterface::SCOPE_STORE, $storeId);
+        $floor = $this->getPriceFloor($storeId);
+        if ($value <= 0) {
+            $value = $floor > 0 ? $floor : 10.0;
+        }
+        return $value;
+    }
+
+    public function getGuaranteedTitle(?int $storeId = null): string
+    {
+        $title = (string) $this->scopeConfig->getValue(self::XML . 'guaranteed_title', ScopeInterface::SCOPE_STORE, $storeId);
+        return $title !== '' ? $title : 'Standard Shipping';
+    }
+
+    public function billedWeightLb(float $packageWeight, ?int $storeId = null): float
+    {
+        return $packageWeight > 0 ? $packageWeight : $this->getDefaultWeightLb($storeId);
+    }
 }

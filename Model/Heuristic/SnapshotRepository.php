@@ -75,6 +75,45 @@ class SnapshotRepository
         return $amount;
     }
 
+    public function estimateAnyService(string $destPostcode, float $weightLb, ?int $storeId = null): ?float
+    {
+        $region = $this->markup->zip3($destPostcode);
+        $bucket = $this->contentsBucket->fromWeightLb($weightLb);
+        $connection = $this->resource->getConnection();
+        $table = $this->resource->getTableName(self::TABLE);
+        if (!$connection->isTableExists($table)) {
+            return null;
+        }
+
+        $select = $connection->select()
+            ->from($table, ['region', 'p75_amount', 'merged_p75_amount', 'sample_count'])
+            ->where('contents_bucket = ?', $bucket)
+            ->order('sample_count DESC');
+        $rows = $connection->fetchAll($select);
+        $local = [];
+        $other = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $amount = (float) $row['merged_p75_amount'] > 0 ? (float) $row['merged_p75_amount'] : (float) $row['p75_amount'];
+            if ($amount <= 0) {
+                continue;
+            }
+            if (($row['region'] ?? '') === $region) {
+                $local[] = $amount;
+            } else {
+                $other[] = $amount;
+            }
+        }
+        $pool = $local !== [] ? $local : $other;
+        if ($pool === []) {
+            return null;
+        }
+        sort($pool);
+        return $pool[0];
+    }
+
     /**
      * @param list<array{region:string,contents_bucket:string,service_code:string,sample_count:int,median_amount:float,p75_amount:float,merged_p75_amount:float}> $cells
      */

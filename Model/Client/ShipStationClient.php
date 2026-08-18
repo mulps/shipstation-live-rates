@@ -16,6 +16,7 @@ class ShipStationClient
 {
     private const CACHE_PREFIX = 'mulps_sslr_live_';
     private const CIRCUIT_KEY = 'mulps_sslr_circuit';
+    private const LAST_GOOD_PREFIX = 'mulps_sslr_lastgood_';
 
     public function __construct(
         private readonly ModuleConfig $config,
@@ -44,9 +45,14 @@ class ShipStationClient
 
         try {
             $carrierIds = $this->resolveCarrierIds($storeId);
+        } catch (ShipStationHttpException $e) {
+            $this->logger->error('Mulps_ShipStationLiveRates carrier list failed: ' . $e->getMessage());
+            if ($e->isRetryable()) {
+                $this->cache->save('1', self::CIRCUIT_KEY, ['MULPS_SSLR'], 120);
+            }
+            return null;
         } catch (RuntimeException $e) {
             $this->logger->error('Mulps_ShipStationLiveRates carrier list failed: ' . $e->getMessage());
-            $this->cache->save('1', self::CIRCUIT_KEY, ['MULPS_SSLR'], 120);
             return null;
         }
         if ($carrierIds === []) {
@@ -68,18 +74,31 @@ class ShipStationClient
             return null;
         }
 
-        $weightLb = max(0.1, (float) $request->getPackageWeight());
+        $weightLb = $this->config->billedWeightLb((float) $request->getPackageWeight(), $storeId);
         $destStreet = trim((string) $request->getDestStreet());
 
         try {
             if ($destStreet === '') {
                 $body = $this->postJson('/rates/estimate', $this->estimatePayload($request, $carrierIds, $origin, $dest, $weightLb, $storeId), $storeId);
             } else {
-                $body = $this->postJson('/rates', $this->fullRatePayload($request, $carrierIds, $origin, $dest, $weightLb, $storeId), $storeId);
+                try {
+                    $body = $this->postJson('/rates', $this->fullRatePayload($request, $carrierIds, $origin, $dest, $weightLb, $storeId), $storeId);
+                } catch (ShipStationHttpException $e) {
+                    if ($e->isRetryable()) {
+                        throw $e;
+                    }
+                    $this->logger->warning('Mulps_ShipStationLiveRates full rate rejected, retrying ZIP estimate: ' . $e->getMessage());
+                    $body = $this->postJson('/rates/estimate', $this->estimatePayload($request, $carrierIds, $origin, $dest, $weightLb, $storeId), $storeId);
+                }
             }
+        } catch (ShipStationHttpException $e) {
+            $this->logger->error('Mulps_ShipStationLiveRates live rate failed: ' . $e->getMessage());
+            if ($e->isRetryable()) {
+                $this->cache->save('1', self::CIRCUIT_KEY, ['MULPS_SSLR'], 120);
+            }
+            return null;
         } catch (RuntimeException $e) {
             $this->logger->error('Mulps_ShipStationLiveRates live rate failed: ' . $e->getMessage());
-            $this->cache->save('1', self::CIRCUIT_KEY, ['MULPS_SSLR'], 120);
             return null;
         }
 
@@ -100,6 +119,7 @@ class ShipStationClient
                 ['MULPS_SSLR'],
                 $ttl
             );
+            $this->rememberLastGood($result['rates'], $dest, $weightLb);
         }
 
         return $result;
@@ -301,14 +321,14 @@ class ShipStationClient
         $status = (int) $curl->getStatus();
         $response = (string) $curl->getBody();
         if ($status === 429 || $status >= 500 || $status === 0) {
-            throw new RuntimeException('HTTP ' . $status);
+            throw new ShipStationHttpException('HTTP ' . $status, $status);
         }
         $decoded = json_decode($response, true);
         if (!is_array($decoded)) {
-            throw new RuntimeException('Non-JSON ShipStation response HTTP ' . $status);
+            throw new ShipStationHttpException('Non-JSON ShipStation response HTTP ' . $status, $status);
         }
         if ($status >= 400) {
-            throw new RuntimeException('HTTP ' . $status . ' ' . substr($response, 0, 300));
+            throw new ShipStationHttpException('HTTP ' . $status . ' ' . substr($response, 0, 300), $status);
         }
         return $decoded;
     }
@@ -321,10 +341,51 @@ class ShipStationClient
         $parts = [
             (string) $request->getDestPostcode(),
             (string) $request->getDestCountryId(),
-            (string) $request->getPackageWeight(),
+            (string) $this->config->billedWeightLb((float) $request->getPackageWeight(), $storeId),
             $this->config->getOriginPostalCode($storeId),
             implode(',', $carrierIds),
         ];
         return hash('sha256', implode('|', $parts));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rates
+     */
+    private function rememberLastGood(array $rates, string $dest, float $weightLb): void
+    {
+        $cheapest = null;
+        foreach ($rates as $rate) {
+            $amount = $rate['shipping_amount']['amount'] ?? null;
+            if (!is_numeric($amount)) {
+                continue;
+            }
+            $value = (float) $amount;
+            $cheapest = $cheapest === null ? $value : min($cheapest, $value);
+        }
+        if ($cheapest === null) {
+            return;
+        }
+        $payload = (string) $cheapest;
+        $this->cache->save($payload, self::LAST_GOOD_PREFIX . 'any', ['MULPS_SSLR'], 604800);
+        $zip3 = substr(preg_replace('/\D+/', '', $dest) ?? '', 0, 3);
+        if ($zip3 !== '') {
+            $this->cache->save($payload, self::LAST_GOOD_PREFIX . $zip3, ['MULPS_SSLR'], 604800);
+        }
+        unset($weightLb);
+    }
+
+    public function lastGoodAmount(string $destPostcode): ?float
+    {
+        $zip3 = substr(preg_replace('/\D+/', '', $destPostcode) ?? '', 0, 3);
+        foreach ([$zip3, 'any'] as $suffix) {
+            if ($suffix === '') {
+                continue;
+            }
+            $cached = $this->cache->load(self::LAST_GOOD_PREFIX . $suffix);
+            if (is_string($cached) && is_numeric($cached)) {
+                return (float) $cached;
+            }
+        }
+        return null;
     }
 }

@@ -20,6 +20,9 @@
                 <show_estimated_title>1</show_estimated_title>
                 <heuristic_min_samples>8</heuristic_min_samples>
                 <lookback_days>180</lookback_days>
+                <default_weight_lb>0.5</default_weight_lb>
+                <guaranteed_price>10</guaranteed_price>
+                <guaranteed_title>Standard Shipping</guaranteed_title>
             </ssliverates>
         </carriers>
     </default>

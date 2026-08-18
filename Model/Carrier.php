@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mulps\ShipStationLiveRates\Model;
 
+use Magento\Framework\DataObject;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Quote\Model\Quote\Address\RateRequest;
 use Magento\Quote\Model\Quote\Address\RateResult\ErrorFactory;
@@ -49,39 +50,69 @@ class Carrier extends AbstractCarrier implements CarrierInterface
 
         $storeId = $request->getStoreId() ? (int) $request->getStoreId() : null;
         $dest = (string) $request->getDestPostcode();
-        $weight = (float) $request->getPackageWeight();
+        $weight = $this->moduleConfig->billedWeightLb((float) $request->getPackageWeight(), $storeId);
         $result = $this->rateResultFactory->create();
-
-        $live = $this->client->getRates($request, $storeId);
         $appended = 0;
-        if ($live !== null && $live['rates'] !== []) {
-            $usps = $this->uspsDetector->detect($live['rate_response'], true);
-            $this->_logger->info('Mulps_ShipStationLiveRates USPS lookup: ' . $usps->status . ' ' . $usps->detail);
-            foreach ($this->cheapestPerService($live['rates']) as $rate) {
-                $raw = $this->rawAmount($rate);
-                if ($raw === null) {
-                    continue;
+
+        try {
+            $live = $this->client->getRates($request, $storeId);
+            if ($live !== null && $live['rates'] !== []) {
+                $usps = $this->uspsDetector->detect($live['rate_response'], true);
+                $this->_logger->info('Mulps_ShipStationLiveRates USPS lookup: ' . $usps->status . ' ' . $usps->detail);
+                foreach ($this->cheapestPerService($live['rates']) as $rate) {
+                    $raw = $this->rawAmount($rate);
+                    if ($raw === null) {
+                        continue;
+                    }
+                    $code = preg_replace('/[^a-z0-9_]/', '_', strtolower((string) ($rate['service_code'] ?? 'live'))) ?? 'live';
+                    $title = (string) ($rate['service_type'] ?? $rate['service_code'] ?? $this->moduleConfig->getMethodName($storeId));
+                    $result->append($this->method($code, $title, $this->markup->apply($raw, $dest, $storeId)));
+                    $appended++;
                 }
-                $code = preg_replace('/[^a-z0-9_]/', '_', strtolower((string) ($rate['service_code'] ?? 'live'))) ?? 'live';
-                $title = (string) ($rate['service_type'] ?? $rate['service_code'] ?? $this->moduleConfig->getMethodName($storeId));
-                $result->append($this->method($code, $title, $this->markup->apply($raw, $dest, $storeId)));
-                $appended++;
             }
+        } catch (\Throwable $e) {
+            $this->_logger->error('Mulps_ShipStationLiveRates collectRates: ' . $e->getMessage());
         }
 
         if ($appended === 0) {
-            $raw = $this->heuristics->estimate($dest, $weight, 'default', $storeId);
+            $raw = $this->heuristics->estimateAnyService($dest, $weight, $storeId)
+                ?? $this->client->lastGoodAmount($dest);
+            $title = $this->moduleConfig->getGuaranteedTitle($storeId);
             if ($raw === null) {
-                return false;
+                $price = $this->moduleConfig->getGuaranteedPrice($storeId);
+                $result->append($this->method('backup', $title, $price));
+            } else {
+                if ($this->moduleConfig->showEstimatedTitle($storeId)) {
+                    $title .= ' (estimated)';
+                }
+                $result->append($this->method('backup', $title, $this->markup->apply($raw, $dest, $storeId)));
             }
-            $title = $this->moduleConfig->getMethodName($storeId);
-            if ($this->moduleConfig->showEstimatedTitle($storeId)) {
-                $title .= ' (estimated)';
-            }
-            $result->append($this->method('heuristic', $title, $this->markup->apply($raw, $dest, $storeId)));
         }
 
         return $result;
+    }
+
+    /**
+     * Magento may skip the carrier on empty country or extra validation. Keep collecting.
+     *
+     * @param RateRequest $request
+     * @return $this|bool|\Magento\Quote\Model\Quote\Address\RateResult\Error
+     */
+    public function checkAvailableShipCountries(DataObject $request)
+    {
+        if (!$request->getDestCountryId()) {
+            return $this;
+        }
+        return parent::checkAvailableShipCountries($request);
+    }
+
+    /**
+     * @param RateRequest $request
+     * @return $this|bool|\Magento\Quote\Model\Quote\Address\RateResult\Error
+     */
+    public function proccessAdditionalValidation(DataObject $request)
+    {
+        return $this;
     }
 
     /**
@@ -90,7 +121,7 @@ class Carrier extends AbstractCarrier implements CarrierInterface
     public function getAllowedMethods(): array
     {
         return [
-            'heuristic' => $this->moduleConfig->getMethodName(),
+            'backup' => $this->moduleConfig->getGuaranteedTitle(),
         ];
     }
 
