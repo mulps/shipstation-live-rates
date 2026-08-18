@@ -69,29 +69,13 @@ class ShipStationClient
         }
 
         $weightLb = max(0.1, (float) $request->getPackageWeight());
-        $destStreet = trim((string) $request->getDestStreet());
-        $useEstimate = $destStreet === '';
 
         try {
-            if ($useEstimate) {
-                $body = $this->postJson('/rates/estimate', [
-                    'carrier_ids' => $carrierIds,
-                    'from_country_code' => $this->config->getOriginCountry($storeId),
-                    'from_postal_code' => $origin,
-                    'to_country_code' => $request->getDestCountryId() ?: 'US',
-                    'to_postal_code' => $dest,
-                    'to_city_locality' => (string) $request->getDestCity(),
-                    'to_state_province' => (string) $request->getDestRegionCode(),
-                    'weight' => [
-                        'value' => $weightLb,
-                        'unit' => 'pound',
-                    ],
-                    'confirmation' => 'none',
-                    'address_residential_indicator' => 'unknown',
-                ], $storeId);
-            } else {
-                $body = $this->postJson('/rates', $this->fullRatePayload($request, $carrierIds, $origin, $dest, $weightLb, $storeId), $storeId);
-            }
+            $body = $this->postJson(
+                '/rates',
+                $this->fullRatePayload($request, $carrierIds, $origin, $dest, $weightLb, $storeId),
+                $storeId
+            );
         } catch (RuntimeException $e) {
             $this->logger->error('Mulps_ShipStationLiveRates live rate failed: ' . $e->getMessage());
             $this->cache->save('1', self::CIRCUIT_KEY, ['MULPS_SSLR'], 120);
@@ -188,6 +172,9 @@ class ShipStationClient
         $fromCity = $this->config->getOriginCity($storeId);
         $toStreet = trim((string) $request->getDestStreet());
         $toCity = trim((string) $request->getDestCity());
+        $toState = (string) $request->getDestRegionCode();
+        $toLine1 = $toStreet !== '' ? $toStreet : ($toCity !== '' ? $toCity : $dest);
+        $toLocality = $toCity !== '' ? $toCity : ($toState !== '' ? $toState : $dest);
 
         return [
             'rate_options' => [
@@ -198,17 +185,17 @@ class ShipStationClient
                 'ship_from' => [
                     'name' => $this->config->getOriginName($storeId),
                     'phone' => '000-000-0000',
-                    'address_line1' => $fromStreet !== '' ? $fromStreet : 'Warehouse',
-                    'city_locality' => $fromCity !== '' ? $fromCity : 'City',
+                    'address_line1' => $fromStreet !== '' ? $fromStreet : $origin,
+                    'city_locality' => $fromCity !== '' ? $fromCity : $origin,
                     'postal_code' => $origin,
                     'country_code' => $this->config->getOriginCountry($storeId),
                 ],
                 'ship_to' => [
                     'name' => 'Customer',
                     'phone' => '000-000-0000',
-                    'address_line1' => $toStreet !== '' ? $toStreet : ($toCity !== '' ? $toCity : 'Address'),
-                    'city_locality' => $toCity,
-                    'state_province' => (string) $request->getDestRegionCode(),
+                    'address_line1' => $toLine1,
+                    'city_locality' => $toLocality,
+                    'state_province' => $toState,
                     'postal_code' => $dest,
                     'country_code' => $request->getDestCountryId() ?: 'US',
                 ],
