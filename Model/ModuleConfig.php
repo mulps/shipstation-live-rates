@@ -161,12 +161,25 @@ class ModuleConfig
         return $value > 0 ? $value : 0.5;
     }
 
-    public function getGuaranteedPrice(?int $storeId = null): float
+    public function isDomesticDestination(string $destCountryId, ?int $storeId = null): bool
     {
-        $value = (float) $this->scopeConfig->getValue(self::XML . 'guaranteed_price', ScopeInterface::SCOPE_STORE, $storeId);
-        $floor = $this->getPriceFloor($storeId);
+        $dest = strtoupper($destCountryId);
+        if ($dest === '') {
+            $dest = strtoupper($this->getOriginCountry($storeId));
+        }
+        return $dest === strtoupper($this->getOriginCountry($storeId));
+    }
+
+    public function getGuaranteedPrice(bool $domestic, ?int $storeId = null): float
+    {
+        $path = $domestic ? 'guaranteed_price_domestic' : 'guaranteed_price_international';
+        $value = (float) $this->scopeConfig->getValue(self::XML . $path, ScopeInterface::SCOPE_STORE, $storeId);
+        if ($value <= 0 && $domestic) {
+            $value = (float) $this->scopeConfig->getValue(self::XML . 'guaranteed_price', ScopeInterface::SCOPE_STORE, $storeId);
+        }
         if ($value <= 0) {
-            $value = $floor > 0 ? $floor : 10.0;
+            $floor = $this->getPriceFloor($storeId);
+            $value = $domestic ? ($floor > 0 ? $floor : 10.0) : 45.0;
         }
         return $value;
     }

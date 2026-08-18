@@ -75,12 +75,16 @@ class Carrier extends AbstractCarrier implements CarrierInterface
         }
 
         if ($appended === 0) {
-            $raw = $this->heuristics->estimateAnyService($dest, $weight, $storeId)
-                ?? $this->client->lastGoodAmount($dest);
+            $domestic = $this->moduleConfig->isDomesticDestination((string) $request->getDestCountryId(), $storeId);
+            $raw = null;
+            if ($domestic) {
+                $raw = $this->heuristics->estimateAnyService($dest, $weight, $storeId)
+                    ?? $this->client->lastGoodAmount($dest);
+            }
             $title = $this->moduleConfig->getGuaranteedTitle($storeId);
             if ($raw === null) {
-                $price = $this->moduleConfig->getGuaranteedPrice($storeId);
-                $result->append($this->method('backup', $title, $price));
+                $price = $this->moduleConfig->getGuaranteedPrice($domestic, $storeId);
+                $result->append($this->method($domestic ? 'backup' : 'backup_intl', $title, $price));
             } else {
                 if ($this->moduleConfig->showEstimatedTitle($storeId)) {
                     $title .= ' (estimated)';
@@ -122,6 +126,7 @@ class Carrier extends AbstractCarrier implements CarrierInterface
     {
         return [
             'backup' => $this->moduleConfig->getGuaranteedTitle(),
+            'backup_intl' => $this->moduleConfig->getGuaranteedTitle(),
         ];
     }
 

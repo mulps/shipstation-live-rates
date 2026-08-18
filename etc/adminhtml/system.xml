@@ -67,9 +67,13 @@
                     <label>Default Package Weight (lb)</label>
                     <comment>Used when a product has no weight so a rate can still be calculated.</comment>
                 </field>
-                <field id="guaranteed_price" translate="label comment" type="text" sortOrder="170" showInDefault="1" showInWebsite="1" showInStore="1">
-                    <label>Backup Shipping Price</label>
-                    <comment>Shown if live rates cannot be calculated so the customer always has a shipping option.</comment>
+                <field id="guaranteed_price_domestic" translate="label comment" type="text" sortOrder="170" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Backup Price (Domestic)</label>
+                    <comment>Used when live rates fail and the destination is in the same country as your shipping origin.</comment>
+                </field>
+                <field id="guaranteed_price_international" translate="label comment" type="text" sortOrder="172" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Backup Price (International)</label>
+                    <comment>Used when live rates fail and the destination is a different country. Set this higher than domestic.</comment>
                 </field>
                 <field id="guaranteed_title" translate="label" type="text" sortOrder="175" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Backup Method Name</label>
