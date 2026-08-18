@@ -19,16 +19,16 @@
                 <field id="api_key" translate="label comment" type="obscure" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>ShipStation API Key</label>
                     <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
-                    <comment>v2 API key. Never commit this value.</comment>
+                    <comment>ShipStation API v2 key from your ShipStation account settings. Stored encrypted.</comment>
                 </field>
                 <field id="api_base_url" translate="label" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>API Base URL</label>
                 </field>
                 <field id="carrier_ids" translate="label comment" type="text" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Carrier IDs</label>
-                    <comment>Optional. Leave empty to use every carrier from GET /v2/carriers. Set a comma-separated list (e.g. se-199728) to restrict which accounts are rated.</comment>
+                    <comment>Optional. Leave empty to rate all connected ShipStation carriers, or enter specific carrier IDs separated by commas.</comment>
                 </field>
-                    <comment>Optional override. Blank uses Magento Shipping Settings origin ZIP (Stores → Configuration → Sales → Shipping Settings).</comment>
+                    <comment>Optional. If blank, uses the origin ZIP from Stores → Configuration → Sales → Shipping Settings.</comment>
                 <field id="timeout_seconds" translate="label" type="text" sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Live Rate Timeout (seconds)</label>
                 </field>
@@ -37,18 +37,18 @@
                 </field>
                 <field id="global_markup_percent" translate="label comment" type="text" sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Global Markup Percent</label>
-                    <comment>Padded onto the raw ShipStation or heuristic amount. Not shown as a separate fee.</comment>
+                    <comment>Added to the shipping price shown to the customer. Not listed as a separate handling fee.</comment>
                 </field>
                 <field id="regional_markup_json" translate="label comment" type="textarea" sortOrder="110" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Regional Markup JSON</label>
-                    <comment>ZIP3 keys to percent, e.g. {"100":12,"850":8}. Overrides global when dest ZIP3 matches.</comment>
+                    <comment>Optional extra markup by destination ZIP prefix, for example {"100":12,"850":8}.</comment>
                 </field>
                 <field id="price_floor" translate="label" type="text" sortOrder="120" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Price Floor</label>
                 </field>
                 <field id="price_ceiling" translate="label comment" type="text" sortOrder="130" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Price Ceiling</label>
-                    <comment>0 means no ceiling.</comment>
+                    <comment>Leave 0 for no maximum.</comment>
                 </field>
                 <field id="show_estimated_title" translate="label" type="select" sortOrder="140" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Mark Heuristic Methods as Estimated</label>
