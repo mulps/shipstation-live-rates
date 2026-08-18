@@ -3,9 +3,14 @@
         xsi:noNamespaceSchemaLocation="urn:magento:framework:Acl/etc/acl.xsd">
     <acl>
         <resources>
+            <!-- Magento_Config::config lives under stores → stores_settings, not under admin directly. -->
             <resource id="Magento_Backend::admin">
-                <resource id="Magento_Config::config">
-                    <resource id="Mulps_ShipStationLiveRates::config" title="ShipStation Live Rates"/>
+                <resource id="Magento_Backend::stores">
+                    <resource id="Magento_Backend::stores_settings">
+                        <resource id="Magento_Config::config">
+                            <resource id="Mulps_ShipStationLiveRates::config" title="ShipStation Live Rates"/>
+                        </resource>
+                    </resource>
                 </resource>
             </resource>
         </resources>
