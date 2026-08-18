@@ -61,7 +61,37 @@ class ModuleConfig
 
     public function getOriginPostalCode(?int $storeId = null): string
     {
-        return (string) $this->scopeConfig->getValue(self::XML . 'origin_postal_code', ScopeInterface::SCOPE_STORE, $storeId);
+        $override = (string) $this->scopeConfig->getValue(self::XML . 'origin_postal_code', ScopeInterface::SCOPE_STORE, $storeId);
+        if ($override !== '') {
+            return $override;
+        }
+        return (string) $this->scopeConfig->getValue('shipping/origin/postcode', ScopeInterface::SCOPE_STORE, $storeId);
+    }
+
+    public function getOriginCountry(?int $storeId = null): string
+    {
+        $country = (string) $this->scopeConfig->getValue('shipping/origin/country_id', ScopeInterface::SCOPE_STORE, $storeId);
+        return $country !== '' ? $country : 'US';
+    }
+
+    public function getOriginCity(?int $storeId = null): string
+    {
+        return (string) $this->scopeConfig->getValue('shipping/origin/city', ScopeInterface::SCOPE_STORE, $storeId);
+    }
+
+    public function getOriginStreet(?int $storeId = null): string
+    {
+        $street = $this->scopeConfig->getValue('shipping/origin/street_line1', ScopeInterface::SCOPE_STORE, $storeId);
+        if (is_array($street)) {
+            return trim(implode(' ', $street));
+        }
+        return trim((string) $street);
+    }
+
+    public function getOriginName(?int $storeId = null): string
+    {
+        $name = (string) $this->scopeConfig->getValue('general/store_information/name', ScopeInterface::SCOPE_STORE, $storeId);
+        return $name !== '' ? $name : 'Warehouse';
     }
 
     public function getTimeoutSeconds(?int $storeId = null): int

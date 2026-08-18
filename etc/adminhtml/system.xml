@@ -28,9 +28,7 @@
                     <label>Carrier IDs</label>
                     <comment>Optional. Leave empty to use every carrier from GET /v2/carriers. Set a comma-separated list (e.g. se-199728) to restrict which accounts are rated.</comment>
                 </field>
-                <field id="origin_postal_code" translate="label" type="text" sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="0">
-                    <label>Origin Postal Code</label>
-                </field>
+                    <comment>Optional override. Blank uses Magento Shipping Settings origin ZIP (Stores → Configuration → Sales → Shipping Settings).</comment>
                 <field id="timeout_seconds" translate="label" type="text" sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Live Rate Timeout (seconds)</label>
                 </field>

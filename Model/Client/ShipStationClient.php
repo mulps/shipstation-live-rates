@@ -69,36 +69,29 @@ class ShipStationClient
         }
 
         $weightLb = max(0.1, (float) $request->getPackageWeight());
-        $payload = [
-            'rate_options' => [
-                'carrier_ids' => $carrierIds,
-            ],
-            'shipment' => [
-                'validate_address' => 'no_validation',
-                'ship_from' => [
-                    'postal_code' => $origin,
-                    'country_code' => 'US',
-                ],
-                'ship_to' => [
-                    'postal_code' => $dest,
-                    'country_code' => $request->getDestCountryId() ?: 'US',
-                    'state_province' => (string) $request->getDestRegionCode(),
-                    'city_locality' => (string) $request->getDestCity(),
-                    'address_line1' => (string) $request->getDestStreet(),
-                ],
-                'packages' => [
-                    [
-                        'weight' => [
-                            'value' => $weightLb,
-                            'unit' => 'pound',
-                        ],
-                    ],
-                ],
-            ],
-        ];
+        $destStreet = trim((string) $request->getDestStreet());
+        $useEstimate = $destStreet === '';
 
         try {
-            $body = $this->postJson('/rates', $payload, $storeId);
+            if ($useEstimate) {
+                $body = $this->postJson('/rates/estimate', [
+                    'carrier_ids' => $carrierIds,
+                    'from_country_code' => $this->config->getOriginCountry($storeId),
+                    'from_postal_code' => $origin,
+                    'to_country_code' => $request->getDestCountryId() ?: 'US',
+                    'to_postal_code' => $dest,
+                    'to_city_locality' => (string) $request->getDestCity(),
+                    'to_state_province' => (string) $request->getDestRegionCode(),
+                    'weight' => [
+                        'value' => $weightLb,
+                        'unit' => 'pound',
+                    ],
+                    'confirmation' => 'none',
+                    'address_residential_indicator' => 'unknown',
+                ], $storeId);
+            } else {
+                $body = $this->postJson('/rates', $this->fullRatePayload($request, $carrierIds, $origin, $dest, $weightLb, $storeId), $storeId);
+            }
         } catch (RuntimeException $e) {
             $this->logger->error('Mulps_ShipStationLiveRates live rate failed: ' . $e->getMessage());
             $this->cache->save('1', self::CIRCUIT_KEY, ['MULPS_SSLR'], 120);
@@ -106,14 +99,18 @@ class ShipStationClient
         }
 
         $rateResponse = is_array($body['rate_response'] ?? null) ? $body['rate_response'] : $body;
-        $rates = $rateResponse['rates'] ?? [];
+        $rates = $rateResponse['rates'] ?? $body['rates'] ?? $body;
         if (!is_array($rates)) {
             $rates = [];
         }
+        $rates = array_values(array_filter($rates, 'is_array'));
+        if ($rates !== [] && !isset($rates[0]['shipping_amount']) && isset($rates[0][0]) && is_array($rates[0][0])) {
+            $rates = $rates[0];
+        }
 
         $result = [
-            'rates' => array_values(array_filter($rates, 'is_array')),
-            'rate_response' => $rateResponse,
+            'rates' => $rates,
+            'rate_response' => is_array($rateResponse) ? $rateResponse : ['rates' => $rates],
         ];
 
         $ttl = $this->config->getLiveCacheTtl($storeId);
@@ -173,6 +170,58 @@ class ShipStationClient
             $this->cache->save(json_encode($ids, JSON_THROW_ON_ERROR), $cacheKey, ['MULPS_SSLR'], 3600);
         }
         return $ids;
+    }
+
+    /**
+     * @param list<string> $carrierIds
+     * @return array<string, mixed>
+     */
+    private function fullRatePayload(
+        RateRequest $request,
+        array $carrierIds,
+        string $origin,
+        string $dest,
+        float $weightLb,
+        ?int $storeId
+    ): array {
+        $fromStreet = $this->config->getOriginStreet($storeId);
+        $fromCity = $this->config->getOriginCity($storeId);
+        $toStreet = trim((string) $request->getDestStreet());
+        $toCity = trim((string) $request->getDestCity());
+
+        return [
+            'rate_options' => [
+                'carrier_ids' => $carrierIds,
+            ],
+            'shipment' => [
+                'validate_address' => 'no_validation',
+                'ship_from' => [
+                    'name' => $this->config->getOriginName($storeId),
+                    'phone' => '000-000-0000',
+                    'address_line1' => $fromStreet !== '' ? $fromStreet : 'Warehouse',
+                    'city_locality' => $fromCity !== '' ? $fromCity : 'City',
+                    'postal_code' => $origin,
+                    'country_code' => $this->config->getOriginCountry($storeId),
+                ],
+                'ship_to' => [
+                    'name' => 'Customer',
+                    'phone' => '000-000-0000',
+                    'address_line1' => $toStreet !== '' ? $toStreet : ($toCity !== '' ? $toCity : 'Address'),
+                    'city_locality' => $toCity,
+                    'state_province' => (string) $request->getDestRegionCode(),
+                    'postal_code' => $dest,
+                    'country_code' => $request->getDestCountryId() ?: 'US',
+                ],
+                'packages' => [
+                    [
+                        'weight' => [
+                            'value' => $weightLb,
+                            'unit' => 'pound',
+                        ],
+                    ],
+                ],
+            ],
+        ];
     }
 
     /**
