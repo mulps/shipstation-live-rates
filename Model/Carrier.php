@@ -55,14 +55,14 @@ class Carrier extends AbstractCarrier implements CarrierInterface
         $live = $this->client->getRates($request, $storeId);
         $appended = 0;
         if ($live !== null && $live['rates'] !== []) {
-            $usps = $this->uspsDetector->detect($live['rate_response'], $this->hasUspsCarrierConfigured($storeId));
+            $usps = $this->uspsDetector->detect($live['rate_response'], true);
             $this->_logger->info('Mulps_ShipStationLiveRates USPS lookup: ' . $usps->status . ' ' . $usps->detail);
-            foreach ($live['rates'] as $rate) {
+            foreach ($this->cheapestPerService($live['rates']) as $rate) {
                 $raw = $this->rawAmount($rate);
                 if ($raw === null) {
                     continue;
                 }
-                $code = (string) ($rate['service_code'] ?? 'live');
+                $code = preg_replace('/[^a-z0-9_]/', '_', strtolower((string) ($rate['service_code'] ?? 'live'))) ?? 'live';
                 $title = (string) ($rate['service_type'] ?? $rate['service_code'] ?? $this->moduleConfig->getMethodName($storeId));
                 $result->append($this->method($code, $title, $this->markup->apply($raw, $dest, $storeId)));
                 $appended++;
@@ -124,8 +124,27 @@ class Carrier extends AbstractCarrier implements CarrierInterface
         return $method;
     }
 
-    private function hasUspsCarrierConfigured(?int $storeId): bool
+    /**
+     * @param list<array<string, mixed>> $rates
+     * @return list<array<string, mixed>>
+     */
+    private function cheapestPerService(array $rates): array
     {
-        return $this->moduleConfig->getCarrierIds($storeId) !== [];
+        $best = [];
+        foreach ($rates as $rate) {
+            $code = (string) ($rate['service_code'] ?? '');
+            if ($code === '') {
+                continue;
+            }
+            $amount = $this->rawAmount($rate);
+            if ($amount === null) {
+                continue;
+            }
+            $current = $best[$code]['amount'] ?? null;
+            if ($current === null || $amount < $current) {
+                $best[$code] = ['amount' => $amount, 'rate' => $rate];
+            }
+        }
+        return array_values(array_map(static fn (array $row): array => $row['rate'], $best));
     }
 }

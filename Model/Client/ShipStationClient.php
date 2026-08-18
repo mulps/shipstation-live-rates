@@ -83,16 +83,13 @@ class ShipStationClient
             return null;
         }
 
-        $rateResponse = is_array($body['rate_response'] ?? null) ? $body['rate_response'] : $body;
-        $rates = $rateResponse['rates'] ?? $body['rates'] ?? null;
-        if (!is_array($rates)) {
-            $rates = array_is_list($body) ? $body : [];
-        }
-        $rates = array_values(array_filter($rates, static fn (mixed $row): bool => is_array($row) && isset($row['shipping_amount'])));
-
+        $rates = $this->extractRates($body);
         $result = [
             'rates' => $rates,
-            'rate_response' => is_array($rateResponse) ? $rateResponse : ['rates' => $rates],
+            'rate_response' => [
+                'rates' => $rates,
+                'status' => $rates !== [] ? 'completed' : 'error',
+            ],
         ];
 
         $ttl = $this->config->getLiveCacheTtl($storeId);
@@ -106,6 +103,28 @@ class ShipStationClient
         }
 
         return $result;
+    }
+
+    /**
+     * @param array<string, mixed>|list<mixed> $body
+     * @return list<array<string, mixed>>
+     */
+    private function extractRates(array $body): array
+    {
+        $nested = $body['rate_response']['rates'] ?? $body['rates'] ?? null;
+        if (!is_array($nested) && array_is_list($body)) {
+            $nested = $body;
+        }
+        if (!is_array($nested)) {
+            return [];
+        }
+        $rates = [];
+        foreach ($nested as $row) {
+            if (is_array($row) && isset($row['shipping_amount'])) {
+                $rates[] = $row;
+            }
+        }
+        return $rates;
     }
 
     /**
