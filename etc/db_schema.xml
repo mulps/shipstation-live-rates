@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+    <table name="mulps_sslr_heuristic" resource="default" engine="innodb" comment="ShipStation live-rates heuristic snapshot">
+        <column xsi:type="int" name="entity_id" unsigned="true" nullable="false" identity="true"/>
+        <column xsi:type="varchar" name="region" nullable="false" length="16" comment="ZIP3 or zone key"/>
+        <column xsi:type="varchar" name="contents_bucket" nullable="false" length="32"/>
+        <column xsi:type="varchar" name="service_code" nullable="false" length="64"/>
+        <column xsi:type="int" name="sample_count" unsigned="true" nullable="false" default="0"/>
+        <column xsi:type="decimal" name="median_amount" scale="4" precision="12" unsigned="true" nullable="false" default="0"/>
+        <column xsi:type="decimal" name="p75_amount" scale="4" precision="12" unsigned="true" nullable="false" default="0"/>
+        <column xsi:type="decimal" name="merged_p75_amount" scale="4" precision="12" unsigned="true" nullable="false" default="0"
+                comment="Precomputed neighbor fill-in"/>
+        <column xsi:type="timestamp" name="updated_at" on_update="true" nullable="false" default="CURRENT_TIMESTAMP"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="entity_id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="MULPS_SSLR_HEURISTIC_REGION_BUCKET_SERVICE">
+            <column name="region"/>
+            <column name="contents_bucket"/>
+            <column name="service_code"/>
+        </constraint>
+    </table>
+</schema>

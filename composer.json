@@ -1,0 +1,20 @@
+{
+    "name": "mulps/shipstation-live-rates",
+    "description": "Magento 2.4.9 shipping carrier: ShipStation live rates, local heuristic fallback, regional fee padding.",
+    "type": "magento2-module",
+    "license": "OSL-3.0",
+    "require": {
+        "php": "~8.4.0 || ~8.5.0",
+        "magento/framework": "*",
+        "magento/module-quote": "*",
+        "magento/module-shipping": "*"
+    },
+    "autoload": {
+        "files": [
+            "registration.php"
+        ],
+        "psr-4": {
+            "Mulps\\ShipStationLiveRates\\": ""
+        }
+    }
+}

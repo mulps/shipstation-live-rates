@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <carriers>
+            <ssliverates>
+                <active>0</active>
+                <model>Mulps\ShipStationLiveRates\Model\Carrier</model>
+                <title>Shipping</title>
+                <name>ShipStation</name>
+                <specificerrmsg>This shipping method is not available.</specificerrmsg>
+                <sallowspecific>0</sallowspecific>
+                <api_base_url>https://api.shipstation.com/v2</api_base_url>
+                <timeout_seconds>3</timeout_seconds>
+                <live_cache_ttl>600</live_cache_ttl>
+                <global_markup_percent>10</global_markup_percent>
+                <regional_markup_json>{}</regional_markup_json>
+                <price_floor>0</price_floor>
+                <price_ceiling>0</price_ceiling>
+                <show_estimated_title>1</show_estimated_title>
+                <heuristic_min_samples>8</heuristic_min_samples>
+                <lookback_days>180</lookback_days>
+            </ssliverates>
+        </carriers>
+    </default>
+</config>
