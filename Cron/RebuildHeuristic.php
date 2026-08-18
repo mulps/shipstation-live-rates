@@ -23,11 +23,11 @@ class RebuildHeuristic
     ) {
     }
 
-    public function execute(): void
+    public function execute(): int
     {
         if ($this->config->getApiKey() === '') {
             $this->logger->info('Mulps_ShipStationLiveRates heuristic rebuild skipped: no API key');
-            return;
+            throw new \RuntimeException('No ShipStation API key is configured.');
         }
 
         $days = $this->config->getLookbackDays();
@@ -77,7 +77,7 @@ class RebuildHeuristic
             } while ($page <= $pages && $page <= 50);
         } catch (\Throwable $e) {
             $this->logger->error('Mulps_ShipStationLiveRates heuristic rebuild failed: ' . $e->getMessage());
-            return;
+            throw $e;
         }
 
         $cells = [];
@@ -105,6 +105,7 @@ class RebuildHeuristic
 
         $this->snapshot->replaceAll($cells);
         $this->logger->info('Mulps_ShipStationLiveRates heuristic rebuild stored ' . count($cells) . ' cells');
+        return count($cells);
     }
 
     /**

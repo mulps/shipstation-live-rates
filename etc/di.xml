@@ -6,4 +6,11 @@
             <argument name="cache" xsi:type="object">Magento\Framework\App\CacheInterface</argument>
         </arguments>
     </type>
+    <type name="Magento\Framework\Console\CommandListInterface">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="ssliverates_rebuild_heuristic" xsi:type="object">Mulps\ShipStationLiveRates\Console\Command\RebuildHeuristicCommand</item>
+            </argument>
+        </arguments>
+    </type>
 </config>
