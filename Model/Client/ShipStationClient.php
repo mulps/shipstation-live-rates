@@ -311,12 +311,12 @@ class ShipStationClient
 
     private function applyTimeout(Curl $curl, int $timeoutSeconds): void
     {
-        $timeoutSeconds = max(1, $timeoutSeconds);
+        $timeoutSeconds = max(0, $timeoutSeconds);
         if (method_exists($curl, 'setTimeout')) {
             $curl->setTimeout($timeoutSeconds);
         }
         $curl->setOption(CURLOPT_TIMEOUT, $timeoutSeconds);
-        $curl->setOption(CURLOPT_CONNECTTIMEOUT, min(20, $timeoutSeconds));
+        $curl->setOption(CURLOPT_CONNECTTIMEOUT, $timeoutSeconds === 0 ? 30 : min(20, max(1, $timeoutSeconds)));
     }
 
     /**

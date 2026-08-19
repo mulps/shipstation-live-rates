@@ -25,6 +25,7 @@ class RebuildHeuristic
 
     public function execute(): int
     {
+        set_time_limit(0);
         if ($this->config->getApiKey() === '') {
             $this->logger->info('Mulps_ShipStationLiveRates heuristic rebuild skipped: no API key');
             throw new \RuntimeException('No ShipStation API key is configured.');
@@ -37,7 +38,7 @@ class RebuildHeuristic
         /** @var array<string, list<float>> $groups */
         $groups = [];
         $page = 1;
-        $pageSize = 25;
+        $pageSize = 100;
         $pages = 1;
 
         try {
@@ -48,7 +49,7 @@ class RebuildHeuristic
                     'page' => $page,
                     'page_size' => $pageSize,
                 ]);
-                $body = $this->client->getJson('/labels?' . $query, null, 90);
+                $body = $this->client->getJson('/labels?' . $query, null, 0);
                 $labels = $body['labels'] ?? [];
                 $pages = (int) ($body['pages'] ?? $page);
                 if (!is_array($labels)) {
