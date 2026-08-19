@@ -12,15 +12,17 @@ class MarkupApplier
     {
     }
 
-    public function apply(float $rawAmount, string $destPostcode, ?int $storeId = null): float
+    public function apply(float $rawAmount, string $destPostcode, ?int $storeId = null, bool $domestic = true): float
     {
         $zip3 = $this->zip3($destPostcode);
         $map = $this->config->getRegionalMarkupMap($storeId);
         $percent = $map[$zip3] ?? $this->config->getGlobalMarkupPercent($storeId);
         $padded = $rawAmount * (1 + $percent / 100);
-        $floor = $this->config->getPriceFloor($storeId);
-        if ($floor > 0) {
-            $padded = max($floor, $padded);
+        if ($domestic) {
+            $floor = $this->config->getPriceFloor($storeId);
+            if ($floor > 0) {
+                $padded = max($floor, $padded);
+            }
         }
         $ceiling = $this->config->getPriceCeiling($storeId);
         if ($ceiling > 0) {

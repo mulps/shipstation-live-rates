@@ -50,6 +50,7 @@ class Carrier extends AbstractCarrier implements CarrierInterface
 
         $storeId = $request->getStoreId() ? (int) $request->getStoreId() : null;
         $dest = (string) $request->getDestPostcode();
+        $domestic = $this->moduleConfig->isDomesticDestination($this->destCountryId($request), $storeId);
         $weight = $this->moduleConfig->billedWeightLb((float) $request->getPackageWeight(), $storeId);
         $result = $this->rateResultFactory->create();
         $appended = 0;
@@ -66,7 +67,7 @@ class Carrier extends AbstractCarrier implements CarrierInterface
                     }
                     $code = preg_replace('/[^a-z0-9_]/', '_', strtolower((string) ($rate['service_code'] ?? 'live'))) ?? 'live';
                     $title = (string) ($rate['service_type'] ?? $rate['service_code'] ?? $this->moduleConfig->getMethodName($storeId));
-                    $result->append($this->method($code, $title, $this->markup->apply($raw, $dest, $storeId)));
+                    $result->append($this->method($code, $title, $this->markup->apply($raw, $dest, $storeId, $domestic)));
                     $appended++;
                 }
             }
@@ -75,7 +76,6 @@ class Carrier extends AbstractCarrier implements CarrierInterface
         }
 
         if ($appended === 0) {
-            $domestic = $this->moduleConfig->isDomesticDestination((string) $request->getDestCountryId(), $storeId);
             $raw = null;
             if ($domestic) {
                 $raw = $this->heuristics->estimateAnyService($dest, $weight, $storeId)
@@ -89,7 +89,7 @@ class Carrier extends AbstractCarrier implements CarrierInterface
                 if ($this->moduleConfig->showEstimatedTitle($storeId)) {
                     $title .= ' (estimated)';
                 }
-                $result->append($this->method('backup', $title, $this->markup->apply($raw, $dest, $storeId)));
+                $result->append($this->method('backup', $title, $this->markup->apply($raw, $dest, $storeId, true)));
             }
         }
 
@@ -117,6 +117,21 @@ class Carrier extends AbstractCarrier implements CarrierInterface
     public function proccessAdditionalValidation(DataObject $request)
     {
         return $this;
+    }
+
+    private function destCountryId(RateRequest $request): string
+    {
+        $candidates = [
+            (string) $request->getDestCountryId(),
+            (string) $request->getData('dest_country_id'),
+        ];
+        foreach ($candidates as $value) {
+            $value = strtoupper(trim($value));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+        return '';
     }
 
     /**

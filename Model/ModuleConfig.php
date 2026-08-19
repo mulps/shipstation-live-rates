@@ -163,11 +163,12 @@ class ModuleConfig
 
     public function isDomesticDestination(string $destCountryId, ?int $storeId = null): bool
     {
-        $dest = strtoupper($destCountryId);
+        $dest = strtoupper(trim($destCountryId));
+        $origin = strtoupper($this->getOriginCountry($storeId));
         if ($dest === '') {
-            $dest = strtoupper($this->getOriginCountry($storeId));
+            return true;
         }
-        return $dest === strtoupper($this->getOriginCountry($storeId));
+        return $dest === $origin;
     }
 
     public function getGuaranteedPrice(bool $domestic, ?int $storeId = null): float
