@@ -7,8 +7,8 @@ namespace Mulps\ShipStationLiveRates\Cron;
 use Mulps\ShipStationLiveRates\Model\Client\ShipStationClient;
 use Mulps\ShipStationLiveRates\Model\Heuristic\ContentsBucket;
 use Mulps\ShipStationLiveRates\Model\Heuristic\SnapshotRepository;
+use Mulps\ShipStationLiveRates\Model\Heuristic\RegionKey;
 use Mulps\ShipStationLiveRates\Model\ModuleConfig;
-use Mulps\ShipStationLiveRates\Model\Rate\MarkupApplier;
 use Psr\Log\LoggerInterface;
 
 class RebuildHeuristic
@@ -18,7 +18,7 @@ class RebuildHeuristic
         private readonly ShipStationClient $client,
         private readonly SnapshotRepository $snapshot,
         private readonly ContentsBucket $contentsBucket,
-        private readonly MarkupApplier $markup,
+        private readonly RegionKey $regionKey,
         private readonly LoggerInterface $logger
     ) {
     }
@@ -60,13 +60,14 @@ class RebuildHeuristic
                         continue;
                     }
                     $cost = $label['shipment_cost']['amount'] ?? null;
+                    $country = (string) ($label['ship_to']['country_code'] ?? 'US');
                     $postcode = (string) ($label['ship_to']['postal_code'] ?? '');
                     $service = (string) ($label['service_code'] ?? 'default');
                     $weight = $this->labelWeightLb($label);
                     if (!is_numeric($cost) || $postcode === '' || $weight <= 0) {
                         continue;
                     }
-                    $region = $this->markup->zip3($postcode);
+                    $region = $this->regionKey->fromAddress($country, $postcode);
                     $bucket = $this->contentsBucket->fromWeightLb($weight);
                     $key = $region . '|' . $bucket . '|' . $service;
                     $groups[$key][] = (float) $cost;
@@ -101,7 +102,12 @@ class RebuildHeuristic
                 $cells[$i]['merged_p75_amount'] = (float) $cell['p75_amount'];
                 continue;
             }
-            $cells[$i]['merged_p75_amount'] = $this->neighborP75($cell, $cells, $minSamples);
+                $cells[$i]['merged_p75_amount'] = $this->neighborP75(
+                    $cell,
+                    $cells,
+                    $minSamples,
+                    $this->config->getOriginCountry()
+                );
         }
 
         $this->snapshot->replaceAll($cells);
@@ -147,15 +153,27 @@ class RebuildHeuristic
      * @param array{region:string,contents_bucket:string,service_code:string,sample_count:int,p75_amount:float} $cell
      * @param list<array{region:string,contents_bucket:string,service_code:string,sample_count:int,p75_amount:float}> $cells
      */
-    private function neighborP75(array $cell, array $cells, int $minSamples): float
+    private function neighborP75(array $cell, array $cells, int $minSamples, string $originCountry): float
     {
-        $origin = (int) $cell['region'];
+        $cellCountry = $this->regionKey->country($cell['region']);
+        $cellGroup = $this->regionKey->group($cellCountry);
+        $originCountry = strtoupper($originCountry);
         $candidates = [];
         foreach ($cells as $other) {
             if ($other['contents_bucket'] !== $cell['contents_bucket'] || $other['service_code'] !== $cell['service_code']) {
                 continue;
             }
-            $distance = abs(((int) $other['region']) - $origin);
+            $otherCountry = $this->regionKey->country($other['region']);
+            $otherGroup = $this->regionKey->group($otherCountry);
+            if ($otherCountry === $cellCountry) {
+                $distance = $this->regionKey->zipDistance($cell['region'], $other['region']);
+            } elseif ($cellGroup === $otherGroup) {
+                $distance = 1000;
+            } elseif ($cellCountry !== $originCountry && $otherCountry !== $originCountry) {
+                $distance = 2000;
+            } else {
+                continue;
+            }
             $candidates[] = ['distance' => $distance, 'n' => (int) $other['sample_count'], 'p75' => (float) $other['p75_amount']];
         }
         usort($candidates, static fn (array $a, array $b): int => $a['distance'] <=> $b['distance']);

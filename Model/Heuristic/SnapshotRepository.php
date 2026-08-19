@@ -7,7 +7,6 @@ namespace Mulps\ShipStationLiveRates\Model\Heuristic;
 use Magento\Framework\App\CacheInterface;
 use Magento\Framework\App\ResourceConnection;
 use Mulps\ShipStationLiveRates\Model\ModuleConfig;
-use Mulps\ShipStationLiveRates\Model\Rate\MarkupApplier;
 
 class SnapshotRepository
 {
@@ -18,17 +17,23 @@ class SnapshotRepository
         private readonly ResourceConnection $resource,
         private readonly CacheInterface $cache,
         private readonly ModuleConfig $config,
-        private readonly MarkupApplier $markup,
+        private readonly RegionKey $regionKey,
         private readonly ContentsBucket $contentsBucket
     ) {
     }
 
-    public function estimate(string $destPostcode, float $weightLb, string $serviceCode, ?int $storeId = null): ?float
-    {
-        $region = $this->markup->zip3($destPostcode);
+    public function estimateAnyService(
+        string $destPostcode,
+        float $weightLb,
+        string $destCountry,
+        ?int $storeId = null
+    ): ?float {
+        $originCountry = strtoupper($this->config->getOriginCountry($storeId));
+        $target = $this->regionKey->fromAddress($destCountry !== '' ? $destCountry : $originCountry, $destPostcode);
+        $targetCountry = $this->regionKey->country($target);
+        $targetGroup = $this->regionKey->group($targetCountry);
         $bucket = $this->contentsBucket->fromWeightLb($weightLb);
-        $min = $this->config->getHeuristicMinSamples($storeId);
-        $cacheKey = self::CACHE_PREFIX . $region . '_' . $bucket . '_' . $serviceCode;
+        $cacheKey = self::CACHE_PREFIX . $target . '_' . $bucket . '_any';
         $cached = $this->cache->load($cacheKey);
         if (is_string($cached) && is_numeric($cached)) {
             return (float) $cached;
@@ -41,57 +46,15 @@ class SnapshotRepository
         }
 
         $select = $connection->select()
-            ->from($table)
-            ->where('region = ?', $region)
-            ->where('contents_bucket = ?', $bucket)
-            ->where('service_code = ?', $serviceCode)
-            ->limit(1);
-        $row = $connection->fetchRow($select);
-        $amount = null;
-        if (is_array($row) && (int) $row['sample_count'] >= $min) {
-            $amount = (float) $row['p75_amount'];
-        } elseif (is_array($row) && (float) $row['merged_p75_amount'] > 0) {
-            $amount = (float) $row['merged_p75_amount'];
-        } else {
-            $select = $connection->select()
-                ->from($table)
-                ->where('contents_bucket = ?', $bucket)
-                ->where('service_code = ?', $serviceCode)
-                ->order('sample_count DESC')
-                ->limit(1);
-            $fallback = $connection->fetchRow($select);
-            if (is_array($fallback) && (float) $fallback['merged_p75_amount'] > 0) {
-                $amount = (float) $fallback['merged_p75_amount'];
-            } elseif (is_array($fallback) && (float) $fallback['p75_amount'] > 0) {
-                $amount = (float) $fallback['p75_amount'];
-            }
-        }
-
-        if ($amount === null) {
-            return null;
-        }
-
-        $this->cache->save((string) $amount, $cacheKey, ['MULPS_SSLR_HEURISTIC'], 86400);
-        return $amount;
-    }
-
-    public function estimateAnyService(string $destPostcode, float $weightLb, ?int $storeId = null): ?float
-    {
-        $region = $this->markup->zip3($destPostcode);
-        $bucket = $this->contentsBucket->fromWeightLb($weightLb);
-        $connection = $this->resource->getConnection();
-        $table = $this->resource->getTableName(self::TABLE);
-        if (!$connection->isTableExists($table)) {
-            return null;
-        }
-
-        $select = $connection->select()
             ->from($table, ['region', 'p75_amount', 'merged_p75_amount', 'sample_count'])
             ->where('contents_bucket = ?', $bucket)
             ->order('sample_count DESC');
         $rows = $connection->fetchAll($select);
-        $local = [];
-        $other = [];
+
+        $exact = [];
+        $country = [];
+        $group = [];
+        $international = [];
         foreach ($rows as $row) {
             if (!is_array($row)) {
                 continue;
@@ -100,18 +63,34 @@ class SnapshotRepository
             if ($amount <= 0) {
                 continue;
             }
-            if (($row['region'] ?? '') === $region) {
-                $local[] = $amount;
-            } else {
-                $other[] = $amount;
+            $region = (string) ($row['region'] ?? '');
+            $cellCountry = $this->regionKey->country($region);
+            $legacyExact = $cellCountry === 'US' && $region === $this->regionKey->postalPrefix($destPostcode);
+            if ($region === $target || $legacyExact) {
+                $exact[] = $amount;
+                continue;
+            }
+            if ($cellCountry === $targetCountry) {
+                $country[] = $amount;
+                continue;
+            }
+            if ($this->regionKey->group($cellCountry) === $targetGroup && $targetGroup !== $targetCountry) {
+                $group[] = $amount;
+                continue;
+            }
+            if ($cellCountry !== $originCountry) {
+                $international[] = $amount;
             }
         }
-        $pool = $local !== [] ? $local : $other;
+
+        $pool = $exact !== [] ? $exact : ($country !== [] ? $country : ($group !== [] ? $group : $international));
         if ($pool === []) {
             return null;
         }
         sort($pool);
-        return $pool[0];
+        $amount = $pool[(int) floor((count($pool) - 1) * 0.75)];
+        $this->cache->save((string) $amount, $cacheKey, ['MULPS_SSLR_HEURISTIC'], 86400);
+        return $amount;
     }
 
     /**

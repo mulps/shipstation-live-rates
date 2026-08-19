@@ -76,10 +76,9 @@ class Carrier extends AbstractCarrier implements CarrierInterface
         }
 
         if ($appended === 0) {
-            $raw = null;
+            $raw = $this->heuristics->estimateAnyService($dest, $weight, $this->destCountryId($request), $storeId);
             if ($domestic) {
-                $raw = $this->heuristics->estimateAnyService($dest, $weight, $storeId)
-                    ?? $this->client->lastGoodAmount($dest);
+                $raw ??= $this->client->lastGoodAmount($dest);
             }
             $title = $this->moduleConfig->getGuaranteedTitle($storeId);
             if ($raw === null) {
@@ -89,7 +88,7 @@ class Carrier extends AbstractCarrier implements CarrierInterface
                 if ($this->moduleConfig->showEstimatedTitle($storeId)) {
                     $title .= ' (estimated)';
                 }
-                $result->append($this->method('backup', $title, $this->markup->apply($raw, $dest, $storeId, true)));
+                $result->append($this->method('backup', $title, $this->markup->apply($raw, $dest, $storeId, $domestic)));
             }
         }
 
