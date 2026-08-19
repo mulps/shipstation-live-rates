@@ -28,6 +28,12 @@
                     <label>Carrier IDs</label>
                     <comment>Optional. Leave empty to rate all connected ShipStation carriers, or enter specific carrier IDs separated by commas.</comment>
                 </field>
+                <field id="disabled_service_codes" translate="label comment" type="multiselect" sortOrder="65" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Disabled Services</label>
+                    <source_model>Mulps\ShipStationLiveRates\Model\Config\Source\DisabledServices</source_model>
+                    <can_be_empty>1</can_be_empty>
+                    <comment>Hide these services at checkout and ignore them in estimates. The list comes from ShipStation. New services stay available until you disable them here. Save the API key first, then refresh this page if the list is empty.</comment>
+                </field>
                 <field id="origin_postal_code" translate="label comment" type="text" sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Origin Postal Code</label>
                     <comment>Optional. If blank, uses the origin ZIP from Stores → Configuration → Sales → Shipping Settings.</comment>

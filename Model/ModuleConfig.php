@@ -59,6 +59,18 @@ class ModuleConfig
         return array_values(array_filter($ids, static fn (string $id): bool => $id !== ''));
     }
 
+    /**
+     * Service codes hidden at checkout and omitted from heuristic history. Unlisted codes stay offered.
+     *
+     * @return list<string>
+     */
+    public function getDisabledServiceCodes(?int $storeId = null): array
+    {
+        $raw = (string) $this->scopeConfig->getValue(self::XML . 'disabled_service_codes', ScopeInterface::SCOPE_STORE, $storeId);
+        $codes = array_map('trim', explode(',', $raw));
+        return array_values(array_filter($codes, static fn (string $code): bool => $code !== ''));
+    }
+
     public function getOriginPostalCode(?int $storeId = null): string
     {
         $override = (string) $this->scopeConfig->getValue(self::XML . 'origin_postal_code', ScopeInterface::SCOPE_STORE, $storeId);

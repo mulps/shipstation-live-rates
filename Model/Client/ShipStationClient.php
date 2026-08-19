@@ -194,6 +194,113 @@ class ShipStationClient
     }
 
     /**
+     * Connected carrier services for admin (label + service_code). Cached. Does not open the live-rate circuit.
+     *
+     * @return list<array{code: string, label: string}>
+     */
+    public function listServiceCatalog(?int $storeId = null): array
+    {
+        $cacheKey = 'mulps_sslr_service_catalog_' . sha1($this->config->getApiBaseUrl($storeId) . '|' . $this->config->getApiKey($storeId));
+        $cached = $this->cache->load($cacheKey);
+        if (is_string($cached) && $cached !== '') {
+            $decoded = json_decode($cached, true);
+            if (is_array($decoded)) {
+                return $this->normalizeServiceCatalog($decoded);
+            }
+        }
+
+        if ($this->config->getApiKey($storeId) === '') {
+            return [];
+        }
+
+        try {
+            $body = $this->getJson('/carriers', $storeId, 15);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Mulps_ShipStationLiveRates service catalog failed: ' . $e->getMessage());
+            return [];
+        }
+
+        $carriers = $body['carriers'] ?? null;
+        if (!is_array($carriers) && array_is_list($body)) {
+            $carriers = $body;
+        }
+        if (!is_array($carriers)) {
+            $carriers = [];
+        }
+        $catalog = [];
+        foreach ($carriers as $carrier) {
+            if (!is_array($carrier)) {
+                continue;
+            }
+            if (!empty($carrier['disabled_by_billing_plan'])) {
+                continue;
+            }
+            $carrierId = (string) ($carrier['carrier_id'] ?? '');
+            $carrierLabel = (string) ($carrier['nickname'] ?? $carrier['friendly_name'] ?? $carrier['carrier_code'] ?? $carrierId);
+            $services = $carrier['services'] ?? null;
+            if (!is_array($services) || $services === []) {
+                if ($carrierId === '') {
+                    continue;
+                }
+                try {
+                    $extra = $this->getJson('/carriers/' . rawurlencode($carrierId) . '/services', $storeId, 15);
+                    $services = $extra['services'] ?? [];
+                } catch (\Throwable $e) {
+                    $this->logger->warning('Mulps_ShipStationLiveRates services for ' . $carrierId . ' failed: ' . $e->getMessage());
+                    $services = [];
+                }
+            }
+            if (!is_array($services)) {
+                continue;
+            }
+            foreach ($services as $service) {
+                if (!is_array($service)) {
+                    continue;
+                }
+                $code = (string) ($service['service_code'] ?? '');
+                if ($code === '') {
+                    continue;
+                }
+                $name = (string) ($service['name'] ?? $code);
+                $catalog[$code] = [
+                    'code' => $code,
+                    'label' => $carrierLabel . ' — ' . $name . ' (' . $code . ')',
+                ];
+            }
+        }
+        $rows = array_values($catalog);
+        usort($rows, static fn (array $a, array $b): int => strcasecmp($a['label'], $b['label']));
+        if ($rows !== []) {
+            $this->cache->save(json_encode($rows, JSON_THROW_ON_ERROR), $cacheKey, ['MULPS_SSLR'], 3600);
+        }
+        return $rows;
+    }
+
+    /**
+     * @param mixed $decoded
+     * @return list<array{code: string, label: string}>
+     */
+    private function normalizeServiceCatalog(mixed $decoded): array
+    {
+        $rows = [];
+        if (!is_array($decoded)) {
+            return [];
+        }
+        foreach ($decoded as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $code = (string) ($row['code'] ?? '');
+            $label = (string) ($row['label'] ?? $code);
+            if ($code === '') {
+                continue;
+            }
+            $rows[] = ['code' => $code, 'label' => $label];
+        }
+        return $rows;
+    }
+
+    /**
      * Cart estimate: ZIP/state/weight only. ShipStation does not require street here.
      *
      * @param list<string> $carrierIds

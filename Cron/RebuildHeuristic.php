@@ -9,6 +9,7 @@ use Mulps\ShipStationLiveRates\Model\Heuristic\ContentsBucket;
 use Mulps\ShipStationLiveRates\Model\Heuristic\SnapshotRepository;
 use Mulps\ShipStationLiveRates\Model\Heuristic\RegionKey;
 use Mulps\ShipStationLiveRates\Model\ModuleConfig;
+use Mulps\ShipStationLiveRates\Model\Rate\ServiceFilter;
 use Psr\Log\LoggerInterface;
 
 class RebuildHeuristic
@@ -19,6 +20,7 @@ class RebuildHeuristic
         private readonly SnapshotRepository $snapshot,
         private readonly ContentsBucket $contentsBucket,
         private readonly RegionKey $regionKey,
+        private readonly ServiceFilter $serviceFilter,
         private readonly LoggerInterface $logger
     ) {
     }
@@ -65,6 +67,9 @@ class RebuildHeuristic
                     $service = (string) ($label['service_code'] ?? 'default');
                     $weight = $this->labelWeightLb($label);
                     if (!is_numeric($cost) || $postcode === '' || $weight <= 0) {
+                        continue;
+                    }
+                    if ($this->serviceFilter->isExcluded($label)) {
                         continue;
                     }
                     $region = $this->regionKey->fromAddress($country, $postcode);

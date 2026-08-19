@@ -17,6 +17,7 @@ use Magento\Shipping\Model\Rate\ResultFactory;
 use Mulps\ShipStationLiveRates\Model\Client\ShipStationClient;
 use Mulps\ShipStationLiveRates\Model\Heuristic\SnapshotRepository;
 use Mulps\ShipStationLiveRates\Model\Rate\MarkupApplier;
+use Mulps\ShipStationLiveRates\Model\Rate\ServiceFilter;
 use Mulps\ShipStationLiveRates\Model\Rate\UspsLookupDetector;
 use Psr\Log\LoggerInterface;
 
@@ -37,6 +38,7 @@ class Carrier extends AbstractCarrier implements CarrierInterface
         private readonly SnapshotRepository $heuristics,
         private readonly MarkupApplier $markup,
         private readonly UspsLookupDetector $uspsDetector,
+        private readonly ServiceFilter $serviceFilter,
         array $data = []
     ) {
         parent::__construct($scopeConfig, $rateErrorFactory, $logger, $data);
@@ -60,7 +62,7 @@ class Carrier extends AbstractCarrier implements CarrierInterface
             if ($live !== null && $live['rates'] !== []) {
                 $usps = $this->uspsDetector->detect($live['rate_response'], true);
                 $this->_logger->info('Mulps_ShipStationLiveRates USPS lookup: ' . $usps->status . ' ' . $usps->detail);
-                foreach ($this->cheapestPerService($live['rates']) as $rate) {
+                foreach ($this->cheapestPerService($live['rates'], $storeId) as $rate) {
                     $raw = $this->rawAmount($rate);
                     if ($raw === null) {
                         continue;
@@ -178,12 +180,12 @@ class Carrier extends AbstractCarrier implements CarrierInterface
      * @param list<array<string, mixed>> $rates
      * @return list<array<string, mixed>>
      */
-    private function cheapestPerService(array $rates): array
+    private function cheapestPerService(array $rates, ?int $storeId): array
     {
         $best = [];
         foreach ($rates as $rate) {
             $code = (string) ($rate['service_code'] ?? '');
-            if ($code === '') {
+            if ($code === '' || $this->serviceFilter->isExcluded($rate, $storeId)) {
                 continue;
             }
             $amount = $this->rawAmount($rate);

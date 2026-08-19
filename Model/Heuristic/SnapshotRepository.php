@@ -7,6 +7,7 @@ namespace Mulps\ShipStationLiveRates\Model\Heuristic;
 use Magento\Framework\App\CacheInterface;
 use Magento\Framework\App\ResourceConnection;
 use Mulps\ShipStationLiveRates\Model\ModuleConfig;
+use Mulps\ShipStationLiveRates\Model\Rate\ServiceFilter;
 
 class SnapshotRepository
 {
@@ -18,7 +19,8 @@ class SnapshotRepository
         private readonly CacheInterface $cache,
         private readonly ModuleConfig $config,
         private readonly RegionKey $regionKey,
-        private readonly ContentsBucket $contentsBucket
+        private readonly ContentsBucket $contentsBucket,
+        private readonly ServiceFilter $serviceFilter
     ) {
     }
 
@@ -46,7 +48,7 @@ class SnapshotRepository
         }
 
         $select = $connection->select()
-            ->from($table, ['region', 'p75_amount', 'merged_p75_amount', 'sample_count'])
+            ->from($table, ['region', 'service_code', 'p75_amount', 'merged_p75_amount', 'sample_count'])
             ->where('contents_bucket = ?', $bucket)
             ->order('sample_count DESC');
         $rows = $connection->fetchAll($select);
@@ -64,6 +66,9 @@ class SnapshotRepository
                 continue;
             }
             $region = (string) ($row['region'] ?? '');
+            if ($this->serviceFilter->isExcludedService((string) ($row['service_code'] ?? ''), $storeId)) {
+                continue;
+            }
             $cellCountry = $this->regionKey->country($region);
             $legacyExact = $cellCountry === 'US' && $region === $this->regionKey->postalPrefix($destPostcode);
             if ($region === $target || $legacyExact) {

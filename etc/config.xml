@@ -11,6 +11,7 @@
                 <specificerrmsg>This shipping method is not available.</specificerrmsg>
                 <sallowspecific>0</sallowspecific>
                 <api_base_url>https://api.shipstation.com/v2</api_base_url>
+                <disabled_service_codes>usps_media_mail</disabled_service_codes>
                 <timeout_seconds>3</timeout_seconds>
                 <live_cache_ttl>600</live_cache_ttl>
                 <global_markup_percent>10</global_markup_percent>
