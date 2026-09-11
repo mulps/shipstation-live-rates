@@ -54,6 +54,7 @@ class Carrier extends AbstractCarrier implements CarrierInterface
         $dest = (string) $request->getDestPostcode();
         $domestic = $this->moduleConfig->isDomesticDestination($this->destCountryId($request), $storeId);
         $weight = $this->moduleConfig->billedWeightLb((float) $request->getPackageWeight(), $storeId);
+        $subtotal = $this->cartSubtotal($request);
         $result = $this->rateResultFactory->create();
         $appended = 0;
 
@@ -69,7 +70,7 @@ class Carrier extends AbstractCarrier implements CarrierInterface
                     }
                     $code = preg_replace('/[^a-z0-9_]/', '_', strtolower((string) ($rate['service_code'] ?? 'live'))) ?? 'live';
                     $title = (string) ($rate['service_type'] ?? $rate['service_code'] ?? $this->moduleConfig->getMethodName($storeId));
-                    $billed = $this->markup->apply($raw, $dest, $storeId, $domestic);
+                    $billed = $this->markup->apply($raw, $dest, $storeId, $domestic, $subtotal);
                     $this->_logger->info(sprintf(
                         'Mulps_ShipStationLiveRates quote service=%s raw=%.2f billed=%.2f weight=%.2f zip=%s',
                         (string) ($rate['service_code'] ?? ''),
@@ -93,13 +94,14 @@ class Carrier extends AbstractCarrier implements CarrierInterface
             }
             $title = $this->moduleConfig->getGuaranteedTitle($storeId);
             if ($raw === null) {
-                $price = $this->moduleConfig->getGuaranteedPrice($domestic, $storeId);
-                $result->append($this->method($domestic ? 'backup' : 'backup_intl', $title, $price));
+                $price = $this->moduleConfig->getGuaranteedPrice($domestic, $storeId)
+                    + $this->markup->subtotalSurcharge($subtotal, $storeId);
+                $result->append($this->method($domestic ? 'backup' : 'backup_intl', $title, round(max(0, $price), 2)));
             } else {
                 if ($this->moduleConfig->showEstimatedTitle($storeId)) {
                     $title .= ' (estimated)';
                 }
-                $result->append($this->method('backup', $title, $this->markup->apply($raw, $dest, $storeId, $domestic)));
+                $result->append($this->method('backup', $title, $this->markup->apply($raw, $dest, $storeId, $domestic, $subtotal)));
             }
         }
 
@@ -127,6 +129,15 @@ class Carrier extends AbstractCarrier implements CarrierInterface
     public function proccessAdditionalValidation(DataObject $request)
     {
         return $this;
+    }
+
+    private function cartSubtotal(RateRequest $request): float
+    {
+        $discounted = (float) $request->getPackageValueWithDiscount();
+        if ($discounted > 0) {
+            return $discounted;
+        }
+        return max(0.0, (float) $request->getPackageValue());
     }
 
     private function destCountryId(RateRequest $request): string

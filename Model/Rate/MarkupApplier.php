@@ -12,12 +12,18 @@ class MarkupApplier
     {
     }
 
-    public function apply(float $rawAmount, string $destPostcode, ?int $storeId = null, bool $domestic = true): float
-    {
+    public function apply(
+        float $rawAmount,
+        string $destPostcode,
+        ?int $storeId = null,
+        bool $domestic = true,
+        float $cartSubtotal = 0.0
+    ): float {
         $zip3 = $this->zip3($destPostcode);
         $map = $this->config->getRegionalMarkupMap($storeId);
         $percent = $map[$zip3] ?? $this->config->getGlobalMarkupPercent($storeId);
         $padded = $rawAmount * (1 + $percent / 100);
+        $padded += $this->subtotalSurcharge($cartSubtotal, $storeId);
         if ($domestic) {
             $floor = $this->config->getPriceFloor($storeId);
             if ($floor > 0) {
@@ -29,6 +35,15 @@ class MarkupApplier
             $padded = min($ceiling, $padded);
         }
         return round(max(0, $padded), 2);
+    }
+
+    public function subtotalSurcharge(float $cartSubtotal, ?int $storeId = null): float
+    {
+        $percent = $this->config->getSubtotalSurchargePercent($storeId);
+        if ($percent <= 0 || $cartSubtotal <= 0) {
+            return 0.0;
+        }
+        return $cartSubtotal * ($percent / 100);
     }
 
     public function zip3(string $postcode): string

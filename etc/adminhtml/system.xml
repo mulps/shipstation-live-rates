@@ -47,6 +47,10 @@
                     <label>Global Markup Percent</label>
                     <comment>Padding on the ShipStation quote, not a substitute for accurate weight, box size, and residential flags. A ZIP prefix in Regional Markup JSON replaces this value for that prefix.</comment>
                 </field>
+                <field id="subtotal_surcharge_percent" translate="label comment" type="text" sortOrder="105" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Cart Subtotal Surcharge Percent</label>
+                    <comment>Added to every shipping quote as a percentage of the cart subtotal after discounts. Default 4. Set 0 to disable.</comment>
+                </field>
                 <field id="regional_markup_json" translate="label comment" type="textarea" sortOrder="110" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Regional Markup JSON</label>
                     <comment>Optional markup by destination ZIP prefix, for example {"100":12,"850":8}. A matching prefix replaces Global Markup Percent for that quote; it is not added on top.</comment>

@@ -175,6 +175,11 @@ class ModuleConfig
         return (float) $this->scopeConfig->getValue(self::XML . 'global_markup_percent', ScopeInterface::SCOPE_STORE, $storeId);
     }
 
+    public function getSubtotalSurchargePercent(?int $storeId = null): float
+    {
+        return max(0.0, (float) $this->scopeConfig->getValue(self::XML . 'subtotal_surcharge_percent', ScopeInterface::SCOPE_STORE, $storeId));
+    }
+
     /**
      * @return array<string, float>
      */

@@ -15,6 +15,7 @@
                 <timeout_seconds>3</timeout_seconds>
                 <live_cache_ttl>600</live_cache_ttl>
                 <global_markup_percent>10</global_markup_percent>
+                <subtotal_surcharge_percent>4</subtotal_surcharge_percent>
                 <regional_markup_json>{}</regional_markup_json>
                 <price_floor>0</price_floor>
                 <price_ceiling>0</price_ceiling>
