@@ -69,7 +69,16 @@ class Carrier extends AbstractCarrier implements CarrierInterface
                     }
                     $code = preg_replace('/[^a-z0-9_]/', '_', strtolower((string) ($rate['service_code'] ?? 'live'))) ?? 'live';
                     $title = (string) ($rate['service_type'] ?? $rate['service_code'] ?? $this->moduleConfig->getMethodName($storeId));
-                    $result->append($this->method($code, $title, $this->markup->apply($raw, $dest, $storeId, $domestic)));
+                    $billed = $this->markup->apply($raw, $dest, $storeId, $domestic);
+                    $this->_logger->info(sprintf(
+                        'Mulps_ShipStationLiveRates quote service=%s raw=%.2f billed=%.2f weight=%.2f zip=%s',
+                        (string) ($rate['service_code'] ?? ''),
+                        $raw,
+                        $billed,
+                        $weight,
+                        $dest
+                    ));
+                    $result->append($this->method($code, $title, $billed));
                     $appended++;
                 }
             }

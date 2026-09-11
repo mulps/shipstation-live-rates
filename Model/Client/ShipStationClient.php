@@ -314,10 +314,12 @@ class ShipStationClient
         float $weightLb,
         ?int $storeId
     ): array {
-        return [
+        $payload = [
             'carrier_ids' => $carrierIds,
             'from_country_code' => $this->config->getOriginCountry($storeId),
             'from_postal_code' => $origin,
+            'from_city_locality' => $this->config->getOriginCity($storeId),
+            'from_state_province' => $this->config->getOriginRegionCode($storeId),
             'to_country_code' => $request->getDestCountryId() ?: 'US',
             'to_postal_code' => $dest,
             'to_city_locality' => (string) $request->getDestCity(),
@@ -326,9 +328,14 @@ class ShipStationClient
                 'value' => $weightLb,
                 'unit' => 'pound',
             ],
-            'confirmation' => 'none',
-            'address_residential_indicator' => 'unknown',
+            'confirmation' => $this->config->getConfirmation($storeId),
+            'address_residential_indicator' => $this->config->assumeResidential($storeId) ? 'yes' : 'unknown',
         ];
+        $dimensions = $this->config->packageDimensions($request, $storeId);
+        if ($dimensions !== null) {
+            $payload['dimensions'] = $dimensions;
+        }
+        return $payload;
     }
 
     /**
@@ -364,6 +371,7 @@ class ShipStationClient
                     'phone' => '000-000-0000',
                     'address_line1' => $fromStreet !== '' ? $fromStreet : $origin,
                     'city_locality' => $fromCity !== '' ? $fromCity : $origin,
+                    'state_province' => $this->config->getOriginRegionCode($storeId),
                     'postal_code' => $origin,
                     'country_code' => $this->config->getOriginCountry($storeId),
                 ],
@@ -375,14 +383,11 @@ class ShipStationClient
                     'state_province' => $toState,
                     'postal_code' => $dest,
                     'country_code' => $request->getDestCountryId() ?: 'US',
+                    'address_residential_indicator' => $this->config->assumeResidential($storeId) ? 'yes' : 'unknown',
                 ],
+                'confirmation' => $this->config->getConfirmation($storeId),
                 'packages' => [
-                    [
-                        'weight' => [
-                            'value' => $weightLb,
-                            'unit' => 'pound',
-                        ],
-                    ],
+                    $this->packagePayload($request, $weightLb, $storeId),
                 ],
             ],
         ];
@@ -451,14 +456,39 @@ class ShipStationClient
      */
     private function fingerprint(RateRequest $request, ?int $storeId, array $carrierIds): string
     {
+        $dimensions = $this->config->packageDimensions($request, $storeId);
         $parts = [
             (string) $request->getDestPostcode(),
             (string) $request->getDestCountryId(),
+            trim((string) $request->getDestStreet()),
+            (string) $request->getDestCity(),
+            (string) $request->getDestRegionCode(),
             (string) $this->config->billedWeightLb((float) $request->getPackageWeight(), $storeId),
             $this->config->getOriginPostalCode($storeId),
             implode(',', $carrierIds),
+            $this->config->getConfirmation($storeId),
+            $this->config->assumeResidential($storeId) ? 'yes' : 'unknown',
+            $dimensions !== null ? implode('x', $dimensions) : 'nodim',
         ];
         return hash('sha256', implode('|', $parts));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function packagePayload(RateRequest $request, float $weightLb, ?int $storeId): array
+    {
+        $package = [
+            'weight' => [
+                'value' => $weightLb,
+                'unit' => 'pound',
+            ],
+        ];
+        $dimensions = $this->config->packageDimensions($request, $storeId);
+        if ($dimensions !== null) {
+            $package['dimensions'] = $dimensions;
+        }
+        return $package;
     }
 
     /**

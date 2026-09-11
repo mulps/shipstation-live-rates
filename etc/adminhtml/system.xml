@@ -45,11 +45,11 @@
                 </field>
                 <field id="global_markup_percent" translate="label comment" type="text" sortOrder="100" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Global Markup Percent</label>
-                    <comment>Added to the shipping price shown to the customer. Not listed as a separate handling fee.</comment>
+                    <comment>Padding on the ShipStation quote, not a substitute for accurate weight, box size, and residential flags. A ZIP prefix in Regional Markup JSON replaces this value for that prefix.</comment>
                 </field>
                 <field id="regional_markup_json" translate="label comment" type="textarea" sortOrder="110" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Regional Markup JSON</label>
-                    <comment>Optional extra markup by destination ZIP prefix, for example {"100":12,"850":8}.</comment>
+                    <comment>Optional markup by destination ZIP prefix, for example {"100":12,"850":8}. A matching prefix replaces Global Markup Percent for that quote; it is not added on top.</comment>
                 </field>
                 <field id="price_floor" translate="label" type="text" sortOrder="120" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Price Floor</label>
@@ -71,6 +71,29 @@
                 <field id="default_weight_lb" translate="label comment" type="text" sortOrder="165" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Default Package Weight (lb)</label>
                     <comment>Used when a product has no weight so a rate can still be calculated.</comment>
+                </field>
+                <field id="weight_padding_percent" translate="label comment" type="text" sortOrder="166" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Weight Padding Percent</label>
+                    <comment>Extra billed weight for packing materials. Catalog weight of 1 lb with 25 becomes 1.25 lb in the ShipStation request.</comment>
+                </field>
+                <field id="default_length_in" translate="label comment" type="text" sortOrder="167" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Default Package Length (in)</label>
+                    <comment>Required for accurate quotes. Carriers bill dimensional weight from box size, not product weight. Match the box you actually use when buying labels.</comment>
+                </field>
+                <field id="default_width_in" translate="label" type="text" sortOrder="168" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Default Package Width (in)</label>
+                </field>
+                <field id="default_height_in" translate="label" type="text" sortOrder="169" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Default Package Height (in)</label>
+                </field>
+                <field id="assume_residential" translate="label comment" type="select" sortOrder="1691" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Assume Residential Delivery</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>UPS and FedEx add a residential surcharge on most customer addresses. Leave Yes unless you mostly ship to businesses.</comment>
+                </field>
+                <field id="confirmation" translate="label comment" type="text" sortOrder="1692" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Delivery Confirmation</label>
+                    <comment>Must match what you select when buying labels: none, delivery, signature, adult_signature, or direct_signature.</comment>
                 </field>
                 <field id="guaranteed_price_domestic" translate="label comment" type="text" sortOrder="170" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Backup Price (Domestic)</label>

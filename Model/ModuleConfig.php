@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Mulps\ShipStationLiveRates\Model;
 
+use Magento\Directory\Model\RegionFactory;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Encryption\EncryptorInterface;
+use Magento\Quote\Model\Quote\Address\RateRequest;
 use Magento\Store\Model\ScopeInterface;
 
 class ModuleConfig
@@ -15,7 +17,8 @@ class ModuleConfig
 
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
-        private readonly EncryptorInterface $encryptor
+        private readonly EncryptorInterface $encryptor,
+        private readonly RegionFactory $regionFactory
     ) {
     }
 
@@ -104,6 +107,56 @@ class ModuleConfig
     {
         $name = (string) $this->scopeConfig->getValue('general/store_information/name', ScopeInterface::SCOPE_STORE, $storeId);
         return $name !== '' ? $name : 'Warehouse';
+    }
+
+    public function getOriginRegionCode(?int $storeId = null): string
+    {
+        $regionId = (int) $this->scopeConfig->getValue('shipping/origin/region_id', ScopeInterface::SCOPE_STORE, $storeId);
+        if ($regionId <= 0) {
+            return '';
+        }
+        $region = $this->regionFactory->create()->load($regionId);
+        return strtoupper(trim((string) $region->getCode()));
+    }
+
+    /**
+     * @return array{unit: string, length: float, width: float, height: float}|null
+     */
+    public function packageDimensions(RateRequest $request, ?int $storeId = null): ?array
+    {
+        $length = (float) $request->getPackageDepth();
+        $width = (float) $request->getPackageWidth();
+        $height = (float) $request->getPackageHeight();
+        if ($length <= 0 || $width <= 0 || $height <= 0) {
+            $length = (float) $this->scopeConfig->getValue(self::XML . 'default_length_in', ScopeInterface::SCOPE_STORE, $storeId);
+            $width = (float) $this->scopeConfig->getValue(self::XML . 'default_width_in', ScopeInterface::SCOPE_STORE, $storeId);
+            $height = (float) $this->scopeConfig->getValue(self::XML . 'default_height_in', ScopeInterface::SCOPE_STORE, $storeId);
+        }
+        if ($length <= 0 || $width <= 0 || $height <= 0) {
+            return null;
+        }
+        return [
+            'unit' => 'inch',
+            'length' => $length,
+            'width' => $width,
+            'height' => $height,
+        ];
+    }
+
+    public function getWeightPaddingPercent(?int $storeId = null): float
+    {
+        return max(0.0, (float) $this->scopeConfig->getValue(self::XML . 'weight_padding_percent', ScopeInterface::SCOPE_STORE, $storeId));
+    }
+
+    public function assumeResidential(?int $storeId = null): bool
+    {
+        return $this->scopeConfig->isSetFlag(self::XML . 'assume_residential', ScopeInterface::SCOPE_STORE, $storeId);
+    }
+
+    public function getConfirmation(?int $storeId = null): string
+    {
+        $value = strtolower(trim((string) $this->scopeConfig->getValue(self::XML . 'confirmation', ScopeInterface::SCOPE_STORE, $storeId)));
+        return $value !== '' ? $value : 'none';
     }
 
     public function getTimeoutSeconds(?int $storeId = null): int
@@ -205,6 +258,11 @@ class ModuleConfig
 
     public function billedWeightLb(float $packageWeight, ?int $storeId = null): float
     {
-        return $packageWeight > 0 ? $packageWeight : $this->getDefaultWeightLb($storeId);
+        $weight = $packageWeight > 0 ? $packageWeight : $this->getDefaultWeightLb($storeId);
+        $padding = $this->getWeightPaddingPercent($storeId);
+        if ($padding > 0) {
+            $weight *= (1 + $padding / 100);
+        }
+        return round($weight, 4);
     }
 }

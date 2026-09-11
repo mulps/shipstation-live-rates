@@ -22,6 +22,12 @@
                 <heuristic_min_samples>8</heuristic_min_samples>
                 <lookback_days>180</lookback_days>
                 <default_weight_lb>0.5</default_weight_lb>
+                <weight_padding_percent>0</weight_padding_percent>
+                <default_length_in>0</default_length_in>
+                <default_width_in>0</default_width_in>
+                <default_height_in>0</default_height_in>
+                <assume_residential>1</assume_residential>
+                <confirmation>none</confirmation>
                 <guaranteed_price_domestic>10</guaranteed_price_domestic>
                 <guaranteed_price_international>45</guaranteed_price_international>
                 <guaranteed_title>Standard Shipping</guaranteed_title>
